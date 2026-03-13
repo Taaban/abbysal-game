@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ABYSSAL</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<canvas id="c"></canvas>
+
+<div id="hud">
+  <div class="hud-box"><div class="hud-label">Score</div><div class="hud-val" id="scoreEl">0</div></div>
+  <div class="hud-box hud-box-right"><div class="hud-label">Best</div><div class="hud-val gold" id="bestEl">0</div></div>
+  <div class="hud-box hud-box-right"><div class="hud-label">Energy</div><div class="hud-val" id="energyEl">0</div></div>
+</div>
+<div id="level-hud"><div class="hud-label">Level</div><div class="hud-val" id="levelEl">1</div></div>
+<div id="xpbar-wrap"><div id="xpbar-bg"><div id="xpbar"></div></div></div>
+<div id="energybar-wrap"><div id="energybar-bg"><div id="energybar"></div></div></div>
+<button id="pauseBtn">❚❚ pause</button>
+
+<div id="theme-banner"></div>
+<div id="powerup-banner"></div>
+<div id="combo-pop"></div>
+<div id="level-pop"></div>
+
+<!-- Main menu / death screen -->
+<div class="fullscreen" id="screen">
+  <div class="screen-title" id="screenTitle">ABYSSAL</div>
+  <div class="screen-sub" id="screenSub">deep sea survival</div>
+  <div class="screen-stats hidden" id="screenStats">
+    <div class="stat-item"><div class="stat-label">Score</div><div class="stat-num" id="finalScore">0</div></div>
+    <div class="stat-item"><div class="stat-label">Best</div><div class="stat-num gold" id="finalBest">0</div></div>
+    <div class="stat-item"><div class="stat-label">Level</div><div class="stat-num" id="finalLevel">1</div></div>
+  </div>
+  <button class="btn" id="startBtn">DIVE IN</button>
+  <div class="how-to"><span>DRAG / MOUSE</span> to swim &nbsp;·&nbsp; <span>EAT</span> smaller creatures<br><span>GROW</span> to hunt hunters &nbsp;·&nbsp; <span>AVOID</span> traps &nbsp;·&nbsp; <span>DOUBLE-TAP</span> to dash</div>
+</div>
+
+<!-- Pause screen -->
+<div class="fullscreen hidden" id="pauseScreen">
+  <div class="screen-title screen-title-paused">PAUSED</div>
+  <div class="screen-sub" id="pauseZone">THE SHALLOWS</div>
+  <div class="screen-stats">
+    <div class="stat-item"><div class="stat-label">Score</div><div class="stat-num" id="pauseScore">0</div></div>
+    <div class="stat-item"><div class="stat-label">Level</div><div class="stat-num" id="pauseLevel">1</div></div>
+    <div class="stat-item"><div class="stat-label">Best</div><div class="stat-num gold" id="pauseBest">0</div></div>
+  </div>
+  <button class="btn" id="resumeBtn">▶ RESUME</button>
+  <div class="pause-divider"></div>
+  <button class="btn danger" id="quitBtn">✕ QUIT TO MENU</button>
+</div>
+
+<script src="game.js"></script>
+</body>
+</html>
