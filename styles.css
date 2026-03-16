@@ -121,7 +121,12 @@ canvas{display:block;position:absolute;inset:0;}
   justify-content:center;font-size:10px;color:rgba(255,255,255,.6);font-family:'Share Tech Mono',monospace;
   border-radius:4px;}
 
-/* Zone progress */
+/* Mute button */
+#muteBtn{position:absolute;top:10px;right:14px;z-index:11;
+  background:transparent;border:none;cursor:pointer;padding:4px 8px;
+  font-size:14px;opacity:.35;transition:opacity .2s;
+  -webkit-tap-highlight-color:transparent;}
+#muteBtn:hover{opacity:.8;}
 #zone-progress{position:absolute;right:16px;top:50%;transform:translateY(-50%);z-index:10;pointer-events:none;
   display:flex;flex-direction:column;gap:6px;align-items:flex-end;}
 .zone-pip{width:6px;height:6px;border-radius:50%;background:rgba(255,255,255,.12);transition:all .3s;}

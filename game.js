@@ -70,6 +70,349 @@ async function renderLeaderboard(containerId, bodyId, loadingId, statusId, playe
 }
 
 // ═══════════════════════════════════════════════════════════════
+// SOUND ENGINE  (Web Audio API — fully procedural, no files)
+// ═══════════════════════════════════════════════════════════════
+const SFX = (() => {
+  let _actx = null;
+  let masterGain = null;
+  let muted = false;
+
+  function getCtx() {
+    if (!_actx) {
+      _actx = new (window.AudioContext || window.webkitAudioContext)();
+      masterGain = _actx.createGain();
+      masterGain.gain.value = 0.5;
+      masterGain.connect(_actx.destination);
+    }
+    if (_actx.state === 'suspended') _actx.resume();
+    return _actx;
+  }
+
+  function mkGain(val, dest) {
+    const g = getCtx().createGain();
+    g.gain.value = val;
+    g.connect(dest || masterGain);
+    return g;
+  }
+  function mkOsc(type, freq, dest) {
+    const o = getCtx().createOscillator();
+    o.type = type;
+    o.frequency.value = freq;
+    o.connect(dest || masterGain);
+    return o;
+  }
+  function mkNoise(dest) {
+    const ac = getCtx();
+    const buf = ac.createBuffer(1, ac.sampleRate * 0.5, ac.sampleRate);
+    const d = buf.getChannelData(0);
+    for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+    const src = ac.createBufferSource();
+    src.buffer = buf;
+    src.connect(dest || masterGain);
+    return src;
+  }
+  function t() { return getCtx().currentTime; }
+
+  function eatOrb(size) {
+    if (muted) return;
+    const now = t();
+    const g = mkGain(0);
+    const o = mkOsc('sine', 300 + size * 18, g);
+    g.gain.setValueAtTime(0, now);
+    g.gain.linearRampToValueAtTime(0.16, now + 0.01);
+    g.gain.exponentialRampToValueAtTime(0.001, now + 0.12);
+    o.frequency.exponentialRampToValueAtTime((300 + size * 18) * 1.4, now + 0.08);
+    o.start(now); o.stop(now + 0.15);
+  }
+
+  function eatGolden() {
+    if (muted) return;
+    const now = t();
+    [523, 659, 784, 1047].forEach((freq, i) => {
+      const g = mkGain(0);
+      const o = mkOsc('sine', freq, g);
+      g.gain.setValueAtTime(0, now + i * 0.05);
+      g.gain.linearRampToValueAtTime(0.14, now + i * 0.05 + 0.02);
+      g.gain.exponentialRampToValueAtTime(0.001, now + i * 0.05 + 0.4);
+      o.start(now + i * 0.05); o.stop(now + i * 0.05 + 0.45);
+    });
+  }
+
+  function eatEnemy(size) {
+    if (muted) return;
+    const now = t();
+    const g1 = mkGain(0);
+    const o1 = mkOsc('sine', 120 + size * 2, g1);
+    g1.gain.setValueAtTime(0, now);
+    g1.gain.linearRampToValueAtTime(0.35, now + 0.008);
+    g1.gain.exponentialRampToValueAtTime(0.001, now + 0.18);
+    o1.frequency.exponentialRampToValueAtTime(40, now + 0.18);
+    o1.start(now); o1.stop(now + 0.2);
+    const filt = getCtx().createBiquadFilter();
+    filt.type = 'bandpass'; filt.frequency.value = 800; filt.Q.value = 2;
+    filt.connect(masterGain);
+    const g2 = mkGain(0, filt);
+    const n = mkNoise(g2);
+    g2.gain.setValueAtTime(0.28, now);
+    g2.gain.exponentialRampToValueAtTime(0.001, now + 0.1);
+    n.start(now); n.stop(now + 0.12);
+  }
+
+  function playerHit() {
+    if (muted) return;
+    const now = t();
+    const g = mkGain(0);
+    const o = mkOsc('sawtooth', 80, g);
+    g.gain.setValueAtTime(0, now);
+    g.gain.linearRampToValueAtTime(0.3, now + 0.005);
+    g.gain.exponentialRampToValueAtTime(0.001, now + 0.22);
+    o.frequency.linearRampToValueAtTime(40, now + 0.22);
+    o.start(now); o.stop(now + 0.25);
+    const g2 = mkGain(0);
+    const o2 = mkOsc('square', 440, g2);
+    g2.gain.setValueAtTime(0.18, now);
+    g2.gain.exponentialRampToValueAtTime(0.001, now + 0.06);
+    o2.start(now); o2.stop(now + 0.07);
+  }
+
+  function shieldBlock() {
+    if (muted) return;
+    const now = t();
+    [800, 1200, 1800].forEach((f, i) => {
+      const g = mkGain(0);
+      const o = mkOsc('triangle', f, g);
+      g.gain.setValueAtTime(0.14, now + i * 0.01);
+      g.gain.exponentialRampToValueAtTime(0.001, now + 0.3 + i * 0.05);
+      o.frequency.linearRampToValueAtTime(f * 0.85, now + 0.3);
+      o.start(now + i * 0.01); o.stop(now + 0.35 + i * 0.05);
+    });
+  }
+
+  function explosion() {
+    if (muted) return;
+    const now = t();
+    const g1 = mkGain(0);
+    const o1 = mkOsc('sine', 60, g1);
+    g1.gain.setValueAtTime(0, now);
+    g1.gain.linearRampToValueAtTime(0.55, now + 0.01);
+    g1.gain.exponentialRampToValueAtTime(0.001, now + 0.5);
+    o1.frequency.exponentialRampToValueAtTime(20, now + 0.5);
+    o1.start(now); o1.stop(now + 0.55);
+    const filt = getCtx().createBiquadFilter();
+    filt.type = 'lowpass'; filt.frequency.value = 1200;
+    filt.connect(masterGain);
+    const g2 = mkGain(0, filt);
+    const n = mkNoise(g2);
+    g2.gain.setValueAtTime(0.45, now);
+    g2.gain.exponentialRampToValueAtTime(0.001, now + 0.4);
+    n.start(now); n.stop(now + 0.45);
+  }
+
+  function pulse() {
+    if (muted) return;
+    const now = t();
+    const filt = getCtx().createBiquadFilter();
+    filt.type = 'bandpass'; filt.frequency.value = 80; filt.Q.value = 8;
+    filt.connect(masterGain);
+    const g = mkGain(0, filt);
+    const n = mkNoise(g);
+    g.gain.setValueAtTime(0.75, now);
+    g.gain.exponentialRampToValueAtTime(0.001, now + 0.6);
+    filt.frequency.exponentialRampToValueAtTime(400, now + 0.5);
+    n.start(now); n.stop(now + 0.65);
+    const g2 = mkGain(0);
+    const o = mkOsc('sawtooth', 200, g2);
+    g2.gain.setValueAtTime(0, now);
+    g2.gain.linearRampToValueAtTime(0.18, now + 0.02);
+    g2.gain.exponentialRampToValueAtTime(0.001, now + 0.35);
+    o.frequency.exponentialRampToValueAtTime(1200, now + 0.3);
+    o.start(now); o.stop(now + 0.38);
+  }
+
+  function dashSound() {
+    if (muted) return;
+    const now = t();
+    const g = mkGain(0);
+    const o = mkOsc('square', 200, g);
+    g.gain.setValueAtTime(0, now);
+    g.gain.linearRampToValueAtTime(0.22, now + 0.005);
+    g.gain.exponentialRampToValueAtTime(0.001, now + 0.15);
+    o.frequency.exponentialRampToValueAtTime(1800, now + 0.12);
+    o.start(now); o.stop(now + 0.16);
+    const filt2 = getCtx().createBiquadFilter();
+    filt2.type = 'highpass'; filt2.frequency.value = 600;
+    filt2.connect(masterGain);
+    const g2 = mkGain(0, filt2);
+    const n = mkNoise(g2);
+    g2.gain.setValueAtTime(0.28, now + 0.05);
+    g2.gain.exponentialRampToValueAtTime(0.001, now + 0.25);
+    n.start(now + 0.05); n.stop(now + 0.28);
+  }
+
+  function burstAbility() {
+    if (muted) return;
+    explosion();
+    const now = t() + 0.05;
+    const g = mkGain(0);
+    const o = mkOsc('sine', 55, g);
+    g.gain.setValueAtTime(0, now);
+    g.gain.linearRampToValueAtTime(0.45, now + 0.02);
+    g.gain.exponentialRampToValueAtTime(0.001, now + 0.8);
+    o.frequency.exponentialRampToValueAtTime(25, now + 0.8);
+    o.start(now); o.stop(now + 0.85);
+  }
+
+  function levelUp() {
+    if (muted) return;
+    const now = t();
+    [261, 329, 392, 523, 659].forEach((f, i) => {
+      const g = mkGain(0);
+      const o = mkOsc('triangle', f, g);
+      g.gain.setValueAtTime(0, now + i * 0.06);
+      g.gain.linearRampToValueAtTime(0.16, now + i * 0.06 + 0.02);
+      g.gain.exponentialRampToValueAtTime(0.001, now + i * 0.06 + 0.25);
+      o.start(now + i * 0.06); o.stop(now + i * 0.06 + 0.28);
+    });
+  }
+
+  function zoneChange() {
+    if (muted) return;
+    const now = t();
+    const g = mkGain(0);
+    const o = mkOsc('sine', 55, g);
+    g.gain.setValueAtTime(0, now);
+    g.gain.linearRampToValueAtTime(0.28, now + 0.4);
+    g.gain.exponentialRampToValueAtTime(0.001, now + 2.5);
+    o.frequency.linearRampToValueAtTime(110, now + 1.2);
+    o.frequency.linearRampToValueAtTime(82, now + 2.5);
+    o.start(now); o.stop(now + 2.6);
+    const g2 = mkGain(0);
+    const o2 = mkOsc('sine', 220, g2);
+    g2.gain.setValueAtTime(0, now + 0.3);
+    g2.gain.linearRampToValueAtTime(0.1, now + 0.8);
+    g2.gain.exponentialRampToValueAtTime(0.001, now + 2.0);
+    o2.start(now + 0.3); o2.stop(now + 2.1);
+  }
+
+  function collectPowerup() {
+    if (muted) return;
+    const now = t();
+    [440, 660, 880].forEach((f, i) => {
+      const g = mkGain(0);
+      const o = mkOsc('sine', f, g);
+      g.gain.setValueAtTime(0, now + i * 0.04);
+      g.gain.linearRampToValueAtTime(0.18, now + i * 0.04 + 0.01);
+      g.gain.exponentialRampToValueAtTime(0.001, now + i * 0.04 + 0.2);
+      o.start(now + i * 0.04); o.stop(now + i * 0.04 + 0.22);
+    });
+  }
+
+  function combo() {
+    if (muted) return;
+    const now = t();
+    const g = mkGain(0);
+    const o = mkOsc('triangle', 400, g);
+    g.gain.setValueAtTime(0, now);
+    g.gain.linearRampToValueAtTime(0.2, now + 0.01);
+    g.gain.exponentialRampToValueAtTime(0.001, now + 0.18);
+    o.frequency.exponentialRampToValueAtTime(900, now + 0.15);
+    o.start(now); o.stop(now + 0.2);
+  }
+
+  function turretFire() {
+    if (muted) return;
+    const now = t();
+    const g = mkGain(0);
+    const o = mkOsc('sawtooth', 600, g);
+    g.gain.setValueAtTime(0, now);
+    g.gain.linearRampToValueAtTime(0.13, now + 0.005);
+    g.gain.exponentialRampToValueAtTime(0.001, now + 0.12);
+    o.frequency.exponentialRampToValueAtTime(120, now + 0.1);
+    o.start(now); o.stop(now + 0.14);
+  }
+
+  function teleport() {
+    if (muted) return;
+    const now = t();
+    const g = mkGain(0);
+    const o = mkOsc('square', 800, g);
+    g.gain.setValueAtTime(0.18, now);
+    g.gain.exponentialRampToValueAtTime(0.001, now + 0.18);
+    o.frequency.exponentialRampToValueAtTime(200, now + 0.15);
+    o.start(now); o.stop(now + 0.2);
+  }
+
+  function death() {
+    if (muted) return;
+    const now = t();
+    [220, 185, 155, 130].forEach((f, i) => {
+      const g = mkGain(0);
+      const o = mkOsc('sine', f, g);
+      g.gain.setValueAtTime(0, now + i * 0.18);
+      g.gain.linearRampToValueAtTime(0.22, now + i * 0.18 + 0.04);
+      g.gain.exponentialRampToValueAtTime(0.001, now + i * 0.18 + 0.35);
+      o.start(now + i * 0.18); o.stop(now + i * 0.18 + 0.4);
+    });
+    const g2 = mkGain(0);
+    const o2 = mkOsc('sine', 40, g2);
+    g2.gain.setValueAtTime(0, now);
+    g2.gain.linearRampToValueAtTime(0.38, now + 0.1);
+    g2.gain.exponentialRampToValueAtTime(0.001, now + 1.2);
+    o2.frequency.exponentialRampToValueAtTime(20, now + 1.2);
+    o2.start(now); o2.stop(now + 1.3);
+  }
+
+  // Looping deep ocean ambience
+  let _ambOscs = [], _ambGain = null;
+  function startAmbience() {
+    if (muted || _ambOscs.length) return;
+    const ac = getCtx();
+    _ambGain = ac.createGain();
+    _ambGain.gain.value = 0;
+    _ambGain.connect(masterGain);
+    [28, 42, 71].forEach(f => {
+      const o = ac.createOscillator();
+      o.type = 'sine'; o.frequency.value = f;
+      o.connect(_ambGain); o.start();
+      _ambOscs.push(o);
+    });
+    const lfo = ac.createOscillator();
+    lfo.frequency.value = 0.08;
+    const lfoG = ac.createGain();
+    lfoG.gain.value = 0.018;
+    lfo.connect(lfoG); lfoG.connect(_ambGain.gain);
+    lfo.start(); _ambOscs.push(lfo);
+    _ambGain.gain.linearRampToValueAtTime(0.04, ac.currentTime + 3);
+  }
+  function stopAmbience() {
+    if (_ambGain) {
+      _ambGain.gain.linearRampToValueAtTime(0, (_actx?.currentTime || 0) + 1);
+      setTimeout(() => { _ambOscs.forEach(o => { try { o.stop(); } catch(e){} }); _ambOscs = []; _ambGain = null; }, 1300);
+    }
+  }
+
+  function toggleMute() {
+    muted = !muted;
+    if (masterGain) masterGain.gain.value = muted ? 0 : 0.5;
+    return muted;
+  }
+
+  return {
+    eatOrb, eatGolden, eatEnemy,
+    playerHit, shieldBlock,
+    explosion, pulse, dash: dashSound, burstAbility,
+    levelUp, zoneChange,
+    collectPowerup, combo,
+    turretFire, teleport,
+    death,
+    startAmbience, stopAmbience,
+    toggleMute,
+    get muted() { return muted; },
+    unlock() { getCtx(); }
+  };
+})();
+
+// ═══════════════════════════════════════════════════════════════
 // GAME ENGINE
 // ═══════════════════════════════════════════════════════════════
 const canvas = document.getElementById('c');
@@ -302,6 +645,7 @@ function checkTheme(){
     prevThemeIdx=themeIdx;themeIdx=ni;themeTransition=0;
     const th=THEMES[themeIdx];
     showBanner(th.name,th.titleColor);
+    SFX.zoneChange();
     if(themeIdx>0) spawnSpecialEnemy();
     for(const o of orbs) o.hue=rnd(th.orbHue[0],th.orbHue[1]);
     for(const h of hunters){h.hue=h.isSmall?th.hunterSafeHue+rnd(-15,15):th.hunterDangerHue+rnd(-15,15);}
@@ -364,6 +708,7 @@ function activatePulse(){
   }
   // Store shockwave ring for rendering
   shockwaveRings.push({x:player.x,y:player.y,r:0,maxR:range,life:1,hue:player.hue});
+  SFX.pulse();
   shake(7);
   announceAbility(hits>0?`PULSE — ${hits} stunned`:'PULSE');
 }
@@ -395,6 +740,7 @@ function activateDash(){
   // Momentum in dash direction, not old velocity
   player.vx=dx/d*6;player.vy=dy/d*6;
   burst(player.x,player.y,player.hue,20,false);
+  SFX.dash();
   player.invincible=Math.max(player.invincible,40);
   announceAbility('WARP DASH');
 }
@@ -422,6 +768,7 @@ function doQuit(){
 }
 
 async function finishGame(titleTxt,subTxt){
+  SFX.stopAmbience();
   if(score>best){best=score;localStorage.setItem('ab_best',best);}
   const pName=document.getElementById('playerNameInput').value.trim()||'DIVER';
   const th=THEMES[themeIdx];
@@ -551,10 +898,10 @@ function draw(ts){
           const pD=Math.sqrt(pD2);
           if(powerupActive!=='ghost'){player.vx+=pDx/pD*t.pullForce;player.vy+=pDy/pD*t.pullForce;}
           if(pD<t.r*1.5&&player.invincible<=0){
-            if(powerupActive==='shield'){powerupActive=null;powerupTimer=0;player.invincible=80;burst(player.x,player.y,200,12,false);floatText(player.x,player.y-30,'SHIELD!',200);}
+            if(powerupActive==='shield'){powerupActive=null;powerupTimer=0;player.invincible=80;burst(player.x,player.y,200,12,false);floatText(player.x,player.y-30,'SHIELD!',200);SFX.shieldBlock();}
             else{
-              player.hp--;player.invincible=60;burst(player.x,player.y,player.hue,12,false);
-              if(player.hp<=0){burst(player.x,player.y,player.hue,32,true);player.alive=false;setTimeout(showDead,700);state='dying';ctx.restore();return;}
+              player.hp--;player.invincible=60;burst(player.x,player.y,player.hue,12,false);SFX.playerHit();
+              if(player.hp<=0){burst(player.x,player.y,player.hue,32,true);player.alive=false;SFX.death();setTimeout(showDead,700);state='dying';ctx.restore();return;}
               else floatText(player.x,player.y-30,'SUCKED!',260);
             }
           }
@@ -597,7 +944,7 @@ function draw(ts){
       }
       if(state==='playing'&&powerupActive!=='ghost'){
         t.shotTimer--;
-        if(t.shotTimer<=0){spawnProjectile(player.x,player.y,t.x,t.y,0);t.shotTimer=t.shotInterval;burst(t.x,t.y,0,8,false);}
+        if(t.shotTimer<=0){spawnProjectile(player.x,player.y,t.x,t.y,0);t.shotTimer=t.shotInterval;burst(t.x,t.y,0,8,false);SFX.turretFire();}
       }
       if(state==='playing'&&powerupActive==='shield'){
         if(dist2(player.x,player.y,t.x,t.y)<(player.displayR+t.r*2+30)**2){burst(t.x,t.y,0,20,true);floatText(t.x,t.y-30,'DESTROYED!',0);t.active=false;}
@@ -619,11 +966,11 @@ function draw(ts){
         const dd=dist2(player.x,player.y,t.x,t.y);
         if(powerupActive==='shield'&&dd<(player.displayR+t.triggerR+20)**2){burst(t.x,t.y,45,20,true);floatText(t.x,t.y-30,'DESTROYED!',45);t.active=false;}
         else if(dd<t.triggerR*t.triggerR&&player.invincible<=0){
-          burst(t.x,t.y,45,20,true);t.active=false;
+          burst(t.x,t.y,45,20,true);t.active=false;SFX.explosion();
           if(powerupActive==='shield'){powerupActive=null;powerupTimer=0;player.invincible=80;burst(player.x,player.y,200,12,false);floatText(player.x,player.y-30,'SHIELD!',200);}
           else if(powerupActive!=='ghost'){
-            player.hp--;player.invincible=60;burst(player.x,player.y,player.hue,12,false);
-            if(player.hp<=0){burst(player.x,player.y,player.hue,32,true);player.alive=false;setTimeout(showDead,700);state='dying';ctx.restore();return;}
+            player.hp--;player.invincible=60;burst(player.x,player.y,player.hue,12,false);SFX.playerHit();
+            if(player.hp<=0){burst(player.x,player.y,player.hue,32,true);player.alive=false;SFX.death();setTimeout(showDead,700);state='dying';ctx.restore();return;}
             else floatText(player.x,player.y-30,'BOOM!',45);
           }
         }
@@ -653,8 +1000,8 @@ function draw(ts){
             if(dist2(player.x,player.y,ex,ey)<(player.displayR+6)**2&&player.invincible<=0){
               if(powerupActive==='shield'){powerupActive=null;powerupTimer=0;player.invincible=80;burst(player.x,player.y,200,12,false);floatText(player.x,player.y-30,'SHIELD!',200);break;}
               else{
-                player.hp--;player.invincible=60;burst(player.x,player.y,player.hue,12,false);
-                if(player.hp<=0){burst(player.x,player.y,player.hue,32,true);player.alive=false;setTimeout(showDead,700);state='dying';ctx.restore();return;}
+                player.hp--;player.invincible=60;burst(player.x,player.y,player.hue,12,false);SFX.playerHit();
+                if(player.hp<=0){burst(player.x,player.y,player.hue,32,true);player.alive=false;SFX.death();setTimeout(showDead,700);state='dying';ctx.restore();return;}
                 else floatText(player.x,player.y-30,'SPIKED!',180);
               }
             }
@@ -691,8 +1038,8 @@ function draw(ts){
         projectiles.splice(i,1);
         if(powerupActive==='shield'){powerupActive=null;powerupTimer=0;player.invincible=80;burst(player.x,player.y,200,12,false);floatText(player.x,player.y-30,'SHIELD!',200);}
         else{
-          player.hp--;player.invincible=60;burst(player.x,player.y,player.hue,12,false);
-          if(player.hp<=0){burst(player.x,player.y,player.hue,32,true);player.alive=false;setTimeout(showDead,700);state='dying';ctx.restore();return;}
+          player.hp--;player.invincible=60;burst(player.x,player.y,player.hue,12,false);SFX.playerHit();
+          if(player.hp<=0){burst(player.x,player.y,player.hue,32,true);player.alive=false;SFX.death();setTimeout(showDead,700);state='dying';ctx.restore();return;}
           else floatText(player.x,player.y-30,'HIT!',0);
         }
       }
@@ -703,7 +1050,7 @@ function draw(ts){
         if(dist2(h.x,h.y,p.x,p.y)<(h.r+p.r)**2){
           h.hp--;
           if(h.hp<=0){
-            burst(h.x,h.y,h.hue,18,true);floatText(h.x,h.y-h.r-10,'DESTROYED',0);
+            burst(h.x,h.y,h.hue,18,true);floatText(h.x,h.y-h.r-10,'DESTROYED',0);SFX.explosion();
             hunters.splice(j,1);spawnHunter();
             killCount++;killStreak++;killStreakTimer=180;
             updateHUD();
@@ -791,7 +1138,7 @@ function draw(ts){
     const dx=player.x-h.x,dy=player.y-h.y,d2=dx*dx+dy*dy;
     if(h.type==='teleporter'&&state==='playing'){
       h.teleTimer--;
-      if(h.teleTimer<=0){const np=safePos(280,520,60);burst(h.x,h.y,h.hue,8,false);h.x=np.x;h.y=np.y;h.teleTimer=rndInt(120,250);burst(h.x,h.y,h.hue,10,false);}
+      if(h.teleTimer<=0){const np=safePos(280,520,60);burst(h.x,h.y,h.hue,8,false);h.x=np.x;h.y=np.y;h.teleTimer=rndInt(120,250);burst(h.x,h.y,h.hue,10,false);SFX.teleport();}
     }
     if(h.type==='bomber'&&state==='playing'){
       if(!h.trail)h.trail=[];
@@ -1099,12 +1446,12 @@ function draw(ts){
     if(o.r>=player.displayR*.92) continue;
     if(dist2(player.x,player.y,o.x,o.y)<(player.displayR+o.r*.5)**2){
       burst(o.x,o.y,o.hue,7,false);score+=o.value;xp+=o.value;combo++;comboTimer=110;
-      if(o.golden){energy=Math.min(maxEnergy,energy+20);floatText(o.x,o.y-o.r-8,'+20 ENERGY',200);}
-      if(combo>=3)showCombo(combo);
+      if(o.golden){energy=Math.min(maxEnergy,energy+20);floatText(o.x,o.y-o.r-8,'+20 ENERGY',200);SFX.eatGolden();} else {SFX.eatOrb(o.r);}
+      if(combo>=3){showCombo(combo);SFX.combo();}
       if(o.value>=2)floatText(o.x,o.y-o.r-8,`+${o.value}`,o.hue);
       player.r=Math.min(75,player.r+o.r*.045);
       while(xp>=xpNext&&level<MAX_LEVEL){
-        xp-=xpNext;xpNext=Math.floor(xpNext*1.2);level++;showLevelUp();
+        xp-=xpNext;xpNext=Math.floor(xpNext*1.2);level++;showLevelUp();SFX.levelUp();
         burst(player.x,player.y,player.hue,20,true);
         player.hue=(player.hue+40)%360;playerHueLerp=player.hue;spawnHunter();
         const tc=trapCount();
@@ -1125,7 +1472,7 @@ function draw(ts){
   for(let i=powerups.length-1;i>=0;i--){
     const p=powerups[i];
     if(dist2(player.x,player.y,p.x,p.y)<(player.displayR+p.r)**2){
-      showPowerupBanner(p.type);burst(p.x,p.y,p.hue,12,true);powerups.splice(i,1);
+      showPowerupBanner(p.type);burst(p.x,p.y,p.hue,12,true);powerups.splice(i,1);SFX.collectPowerup();
     }
   }
   if(frameCount%900===0&&powerups.length<2) spawnPowerup();
@@ -1156,13 +1503,13 @@ function draw(ts){
             const th2=THEMES[themeIdx];
             for(let s=0;s<2;s++) hunters.push({...h,r:h.r*.55,vx:rnd(-1,1),vy:rnd(-1,1),type:'basic',isSmall:true,hue:th2.hunterSafeHue+rnd(-10,10)});
           }
-          burst(h.x,h.y,h.hue,18,true);floatText(h.x,h.y-h.r-10,`+${finalPts}`,50);
+          burst(h.x,h.y,h.hue,18,true);floatText(h.x,h.y-h.r-10,`+${finalPts}`,50);SFX.eatEnemy(h.r);
           if(eg>0)floatText(h.x,h.y-h.r-25,`+${eg}E`,200);
           score+=finalPts;xp+=finalPts;player.r=Math.min(75,player.r+h.r*.1);
           energy=Math.min(maxEnergy,energy+eg);
           killCount++;killStreak++;killStreakTimer=180;
           while(xp>=xpNext&&level<MAX_LEVEL){
-            xp-=xpNext;xpNext=Math.floor(xpNext*1.2);level++;showLevelUp();
+            xp-=xpNext;xpNext=Math.floor(xpNext*1.2);level++;showLevelUp();SFX.levelUp();
             burst(player.x,player.y,player.hue,20,true);
             player.hue=(player.hue+40)%360;playerHueLerp=player.hue;spawnHunter();
           }
@@ -1170,10 +1517,10 @@ function draw(ts){
           hunters.splice(i,1);spawnHunter();checkTheme();updateHUD();
         } else if(h.r>player.displayR*1.05){
           if(powerupActive==='ghost') continue;
-          if(powerupActive==='shield'){powerupActive=null;powerupTimer=0;player.invincible=60;burst(player.x,player.y,200,12,false);floatText(player.x,player.y-30,'SHIELD!',200);continue;}
-          player.hp--;player.invincible=60;burst(player.x,player.y,player.hue,12,false);
+          if(powerupActive==='shield'){powerupActive=null;powerupTimer=0;player.invincible=60;burst(player.x,player.y,200,12,false);floatText(player.x,player.y-30,'SHIELD!',200);SFX.shieldBlock();continue;}
+          player.hp--;player.invincible=60;burst(player.x,player.y,player.hue,12,false);SFX.playerHit();
           killStreak=0;updateHUD();
-          if(player.hp<=0){burst(player.x,player.y,player.hue,32,true);player.alive=false;setTimeout(showDead,700);state='dying';return;}
+          if(player.hp<=0){burst(player.x,player.y,player.hue,32,true);player.alive=false;SFX.death();setTimeout(showDead,700);state='dying';return;}
           else floatText(player.x,player.y-30,'EATEN!',h.hue);
         }
       }
@@ -1185,8 +1532,8 @@ function draw(ts){
           if(dist2(player.x,player.y,ft.x,ft.y)<(player.displayR+ft.r)**2){
             if(powerupActive==='ghost') continue;
             if(powerupActive==='shield'){powerupActive=null;powerupTimer=0;player.invincible=60;break;}
-            player.hp--;player.invincible=60;burst(player.x,player.y,player.hue,12,false);killStreak=0;
-            if(player.hp<=0){burst(player.x,player.y,player.hue,32,true);player.alive=false;setTimeout(showDead,700);state='dying';return;}
+            player.hp--;player.invincible=60;burst(player.x,player.y,player.hue,12,false);killStreak=0;SFX.playerHit();
+            if(player.hp<=0){burst(player.x,player.y,player.hue,32,true);player.alive=false;SFX.death();setTimeout(showDead,700);state='dying';return;}
             else floatText(player.x,player.y-30,'BOMBER!',15);
           }
         }
@@ -1214,6 +1561,7 @@ function doBurst(){
     }
   }
   energy-=25;updateHUD();
+  SFX.burstAbility();
   burst(player.x,player.y,player.hue,25,true);shake(15);
   let msg='';
   if(converted>0) msg+=`${converted} TO ORBS`;
@@ -1283,14 +1631,20 @@ document.getElementById('lbBackBtn').addEventListener('click',()=>{
   if(state==='paused') document.getElementById('pauseScreen').classList.remove('hidden');
 });
 document.getElementById('startBtn').addEventListener('click',()=>{
+  SFX.unlock();
   document.getElementById('screen').classList.add('hidden');
   document.getElementById('screenStats').style.display='none';
   initGame();state='playing';
+  SFX.startAmbience();
   if(!loopRunning){loopRunning=true;last=0;requestAnimationFrame(draw);}
 });
 
 // Load leaderboard on start
 window.addEventListener('resize',resize);
+document.getElementById('muteBtn').addEventListener('click',()=>{
+  const m=SFX.toggleMute();
+  document.getElementById('muteBtn').textContent=m?'🔇':'🔊';
+});
 resize();initBg();
 document.getElementById('bestEl').textContent=best.toLocaleString();
 // Restore name
