@@ -137,3 +137,84 @@ canvas{display:block;position:absolute;inset:0;}
 #kill-counter{position:absolute;left:14px;bottom:28px;z-index:10;pointer-events:none;}
 .kill-label{font-size:7px;letter-spacing:.3em;color:rgba(150,200,255,.5);text-transform:uppercase;}
 .kill-val{font-family:'Orbitron',monospace;font-size:14px;color:rgba(200,230,255,.7);text-shadow:0 0 8px rgba(100,200,255,.5);}
+
+/* ── Mobile touch controls ── */
+/* Hidden by default; JS adds body.touch-device to reveal */
+#mobile-controls{
+  display:none;
+  position:absolute;inset:0;z-index:13;
+  pointer-events:none;   /* container is passthrough */
+}
+body.touch-device #mobile-controls{
+  display:block;
+}
+body.touch-device #hud{padding:8px 10px 0;}
+
+/* Left side: joystick */
+#joystick-zone{
+  position:absolute;left:24px;bottom:40px;
+  width:120px;height:120px;
+  pointer-events:all;
+  touch-action:none;
+  z-index:14;
+}
+#joystick-ring{
+  position:absolute;inset:0;border-radius:50%;
+  border:2px solid rgba(0,255,200,.45);
+  background:rgba(0,255,200,.07);
+}
+#joystick-knob{
+  position:absolute;
+  width:48px;height:48px;top:50%;left:50%;
+  transform:translate(-50%,-50%);
+  border-radius:50%;
+  background:rgba(0,255,200,.28);
+  border:2px solid rgba(0,255,200,.8);
+  box-shadow:0 0 16px rgba(0,255,200,.4);
+  transition:background .1s;
+}
+#joystick-knob.active{
+  background:rgba(0,255,200,.35);
+}
+
+/* Right side: ability buttons */
+#ability-buttons{
+  position:absolute;right:20px;bottom:34px;
+  display:flex;flex-direction:column;gap:10px;align-items:center;
+  pointer-events:all;
+  z-index:14;
+}
+.ability-btn{
+  width:60px;height:60px;border-radius:50%;
+  background:rgba(0,0,0,.6);
+  border:2px solid rgba(255,255,255,.35);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;
+  cursor:pointer;-webkit-tap-highlight-color:transparent;
+  position:relative;overflow:hidden;
+  touch-action:none;
+  box-shadow:0 0 10px rgba(0,0,0,.5);
+}
+.ability-btn:active, .ability-btn.pressed{
+  background:rgba(0,255,200,.18);
+  border-color:rgba(0,255,200,.7);
+}
+.ability-btn.on-cooldown{
+  border-color:rgba(255,255,255,.1);
+  opacity:.55;
+}
+.ab-icon{
+  font-size:18px;color:#fff;line-height:1;
+  font-family:'Share Tech Mono',monospace;
+}
+.ab-key{
+  font-size:7px;letter-spacing:.1em;
+  color:rgba(255,255,255,.5);
+  font-family:'Share Tech Mono',monospace;
+  text-transform:uppercase;
+}
+/* Cooldown sweep overlay */
+.ab-cooldown-ring{
+  position:absolute;inset:0;border-radius:50%;
+  background:conic-gradient(rgba(0,0,0,.55) 0%, transparent 0%);
+  pointer-events:none;
+}

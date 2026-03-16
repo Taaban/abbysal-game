@@ -138,6 +138,31 @@
   <button class="btn" id="lbBackBtn" style="margin-top:20px;">BACK</button>
 </div>
 
+
+<!-- Mobile touch controls (hidden on desktop via CSS) -->
+<div id="mobile-controls">
+  <div id="joystick-zone">
+    <div id="joystick-ring"></div>
+    <div id="joystick-knob"></div>
+  </div>
+  <div id="ability-buttons">
+    <button class="ability-btn" id="btn-pulse" ontouchstart="handleAbilityBtn('pulse',event)" ontouchend="cancelAbilityBtn(event)">
+      <span class="ab-icon">◎</span>
+      <span class="ab-key">PULSE</span>
+      <div class="ab-cooldown-ring" id="pulse-ring"></div>
+    </button>
+    <button class="ability-btn" id="btn-dash" ontouchstart="handleAbilityBtn('dash',event)" ontouchend="cancelAbilityBtn(event)">
+      <span class="ab-icon">»</span>
+      <span class="ab-key">DASH</span>
+      <div class="ab-cooldown-ring" id="dash-ring"></div>
+    </button>
+    <button class="ability-btn" id="btn-burst" ontouchstart="handleAbilityBtn('burst',event)" ontouchend="cancelAbilityBtn(event)">
+      <span class="ab-icon">2×</span>
+      <span class="ab-key">BURST</span>
+    </button>
+  </div>
+</div>
+
 <script src="game.js"></script>
 </body>
 </html>
