@@ -4,37 +4,102 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>ABYSSAL</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Share+Tech+Mono&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="styles.css">
 </head>
 <body>
 <canvas id="c"></canvas>
 
+<!-- Top HUD -->
 <div id="hud">
-  <div class="hud-box"><div class="hud-label">Score</div><div class="hud-val" id="scoreEl">0</div></div>
-  <div class="hud-box hud-box-right"><div class="hud-label">Best</div><div class="hud-val gold" id="bestEl">0</div></div>
-  <div class="hud-box hud-box-right"><div class="hud-label">Energy</div><div class="hud-val" id="energyEl">0</div></div>
+  <div class="hud-box">
+    <div class="hud-label">Score</div>
+    <div class="hud-val" id="scoreEl">0</div>
+  </div>
+  <div class="hud-box hud-box-right">
+    <div class="hud-label">Best</div>
+    <div class="hud-val gold" id="bestEl">0</div>
+  </div>
 </div>
-<div id="level-hud"><div class="hud-label">Level</div><div class="hud-val" id="levelEl">1</div></div>
+
+<!-- Center HUD: level, energy, kill streak -->
+<div id="center-hud">
+  <div id="level-hud">
+    <div class="hud-label">Level</div>
+    <div class="hud-val" id="levelEl">1/50</div>
+  </div>
+  <div id="energy-hud">
+    <div class="hud-label">Energy</div>
+    <div class="hud-val" id="energyEl">0</div>
+  </div>
+  <div id="streak-hud">
+    <div class="hud-val" id="streakEl">🔥 0</div>
+  </div>
+</div>
+
+<!-- Kill counter -->
+<div id="kill-counter">
+  <div class="kill-label">Kills</div>
+  <div class="kill-val" id="killEl">0</div>
+</div>
+
+<!-- Zone progress pips (right side) -->
+<div id="zone-progress"></div>
+
+<!-- Bottom bars -->
 <div id="xpbar-wrap"><div id="xpbar-bg"><div id="xpbar"></div></div></div>
 <div id="energybar-wrap"><div id="energybar-bg"><div id="energybar"></div></div></div>
 <button id="pauseBtn">❚❚ pause</button>
 
+<!-- Notification banners -->
 <div id="theme-banner"></div>
 <div id="powerup-banner"></div>
 <div id="combo-pop"></div>
 <div id="level-pop"></div>
+<div id="ability-announce"></div>
 
 <!-- Main menu / death screen -->
 <div class="fullscreen" id="screen">
   <div class="screen-title" id="screenTitle">ABYSSAL</div>
   <div class="screen-sub" id="screenSub">deep sea survival</div>
+
   <div class="screen-stats hidden" id="screenStats">
     <div class="stat-item"><div class="stat-label">Score</div><div class="stat-num" id="finalScore">0</div></div>
     <div class="stat-item"><div class="stat-label">Best</div><div class="stat-num gold" id="finalBest">0</div></div>
     <div class="stat-item"><div class="stat-label">Level</div><div class="stat-num" id="finalLevel">1</div></div>
+    <div class="stat-item"><div class="stat-label">Kills</div><div class="stat-num" id="finalKills">0</div></div>
+    <div class="stat-item"><div class="stat-label">Zone</div><div class="stat-num" id="finalZone">—</div></div>
   </div>
+
+  <div id="name-entry">
+    <label>Your name for the leaderboard</label>
+    <input type="text" id="playerNameInput" maxlength="12" placeholder="DIVER" autocomplete="off" spellcheck="false">
+  </div>
+
   <button class="btn" id="startBtn">DIVE IN</button>
-  <div class="how-to"><span>DRAG / MOUSE</span> to swim &nbsp;·&nbsp; <span>EAT</span> smaller creatures<br><span>GROW</span> to hunt hunters &nbsp;·&nbsp; <span>AVOID</span> traps &nbsp;·&nbsp; <span>DOUBLE TAP</span> to burst</div>
+  <button class="btn secondary" id="lbBtn" style="font-size:10px;padding:9px 28px;">🏆 LEADERBOARD</button>
+
+  <div class="how-to">
+    <span>DRAG / MOUSE</span> to swim &nbsp;·&nbsp; <span>EAT</span> smaller creatures<br>
+    <span>GROW</span> to hunt hunters &nbsp;·&nbsp; <span>AVOID</span> traps<br>
+    <span>DOUBLE TAP</span> to burst (25 energy) &nbsp;·&nbsp; <span>E</span> pulse shockwave &nbsp;·&nbsp; <span>Q</span> warp dash
+  </div>
+
+  <!-- Inline leaderboard preview -->
+  <div id="leaderboard-section">
+    <div class="lb-title">— Global Leaderboard —</div>
+    <div id="lb-container">
+      <div class="lb-loading" id="lb-loading">LOADING DEPTHS...</div>
+      <table class="lb-table hidden" id="lb-table">
+        <thead><tr>
+          <th>#</th><th>Name</th><th style="text-align:right">Score</th><th style="text-align:right">Zone</th>
+        </tr></thead>
+        <tbody id="lb-body"></tbody>
+      </table>
+    </div>
+    <div class="lb-status" id="lb-status"></div>
+  </div>
 </div>
 
 <!-- Pause screen -->
@@ -45,10 +110,31 @@
     <div class="stat-item"><div class="stat-label">Score</div><div class="stat-num" id="pauseScore">0</div></div>
     <div class="stat-item"><div class="stat-label">Level</div><div class="stat-num" id="pauseLevel">1</div></div>
     <div class="stat-item"><div class="stat-label">Best</div><div class="stat-num gold" id="pauseBest">0</div></div>
+    <div class="stat-item"><div class="stat-label">Kills</div><div class="stat-num" id="pauseKills">0</div></div>
   </div>
   <button class="btn" id="resumeBtn">▶ RESUME</button>
   <div class="pause-divider"></div>
-  <button class="btn danger" id="quitBtn">✕ QUIT TO MENU</button>
+  <button class="btn secondary" id="pauseLbBtn" style="font-size:10px;padding:9px 28px;">🏆 LEADERBOARD</button>
+  <button class="btn danger" id="quitBtn">✕ QUIT</button>
+</div>
+
+<!-- Full leaderboard overlay -->
+<div class="fullscreen hidden" id="lbScreen">
+  <div class="screen-title" style="font-size:clamp(20px,5vw,36px)">LEADERBOARD</div>
+  <div class="screen-sub">global ranking · all time</div>
+  <div id="leaderboard-section-overlay" style="width:min(480px,92vw);">
+    <div id="lb-container2">
+      <div class="lb-loading" id="lb-loading2">LOADING...</div>
+      <table class="lb-table hidden" id="lb-table2">
+        <thead><tr>
+          <th>#</th><th>Name</th><th style="text-align:right">Score</th><th style="text-align:right">Zone</th><th style="text-align:right">Level</th>
+        </tr></thead>
+        <tbody id="lb-body2"></tbody>
+      </table>
+    </div>
+    <div class="lb-status" id="lb-status2"></div>
+  </div>
+  <button class="btn" id="lbBackBtn" style="margin-top:20px;">BACK</button>
 </div>
 
 <script src="game.js"></script>
